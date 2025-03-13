@@ -1,109 +1,72 @@
-import ListBase "mo:base/List";
 import HashMap "mo:base/HashMap";
-import Nat "mo:base/Nat";
-import Hash "mo:base/Hash";
 import Text "mo:base/Text";
-import Result "mo:base/Result";
+import Nat "mo:base/Nat";
+import Debug "mo:base/Debug";
+import Iter "mo:base/Iter";
 
 actor {
-  // Record
-  type CartItem = {
-    product_id : Nat; 
-    quantity : Nat; 
-    price : Nat;
+  type Post = {
+    message: Text;
+    image: Text;
   };
 
-  // Array -> Lista ordenada 
-  type ShoppingCart = [CartItem];
+  stable var postId: Nat = 0;
+  let posts = HashMap.HashMap<Text, Post>(0, Text.equal, Text.hash);
 
-  public func calculateCartTotal(cart : ShoppingCart) : async Nat {
-    var total : Nat = 0;
+  private func generatePostId(): Text {
+    postId += 1;
+    return Nat.toText(postId);
+  };
 
-    for (item in cart.vals()) {
-      // total := total + (item.price * item.quantity);
-      total += item.price * item.quantity;
+  public func createPost(message: Text, image: Text) {
+    let post: Post = { message; image };
+    let key = generatePostId();
+
+    posts.put(key, post);
+    Debug.print("Post successfully created with ID: " # key);
+  };
+
+  public query func getPost(key: Text): async ?Post {
+    posts.get(key);
+  };
+
+  public query func getPosts(): async [(Text, Post)]{
+    let postIter: Iter.Iter<(Text, Post)> = posts.entries();
+    Iter.toArray(postIter)
+  };
+
+  public func updatePost(key: Text, message: Text): async Bool {
+    let post: ?Post = posts.get(key);
+
+    switch(post) {
+      case (null) {
+        Debug.print("Cannot find post.");
+        return false;
+      };
+      case(?currentPost) {
+        let newPost: Post = { message; image = currentPost.image };
+        posts.put(key, newPost);
+
+        Debug.print("Post updated.");
+        return true;
+      };
     };
-
-    return total;
   };
 
-  // 390, 10, 400
+  public func deletePost(key: Text): async Bool {
+    let post: ?Post = posts.get(key);
 
-  public func applyDiscount(total : Nat, discount_rate : Nat, min_total : Nat) : async Nat {
-    var discounted_total : Nat = total;
-    var current_discount : Nat = discount_rate;
+    switch(post) {
+      case (null) {
+        Debug.print("Cannot find post.");
+        return false;
+      };
+      case(_) {
+        ignore posts.remove(key);
 
-    while (discounted_total > min_total and current_discount > 0) {
-      discounted_total := discounted_total - (discounted_total * current_discount / 100);
-      current_discount := current_discount - 5; // Reduce discount rate by 5% each time
+        Debug.print("Post deleted.");
+        return true;
+      };
     };
-
-    return discounted_total;
-  };
-
-  type Product = {
-    product_id : Nat;
-    name : Text;
-    description : Text;
-    price : Nat;
-    stock_quantity : Nat
-  };
-
-  type ProductCatalog = [Product];
-
-  // [Nat]
-  // (Nat, Nat)
-
-  // Tuples: Returning product ID and updated stock
-  public func updateStock(product : Product, quantity_sold : Nat) : async (Nat, Nat) {
-    let new_stock: Nat = product.stock_quantity - quantity_sold;
-    return (product.product_id, new_stock);
-  };
-
-  type Order = {
-    order_id : Nat;
-    customer_id : Nat;
-    items : ShoppingCart;
-    total : Nat
-  };
-
-  let history : ListBase.List<Order> = ListBase.nil();
-
-  // Function to add an order to the history
-  public func addOrder(order : Order) : async ListBase.List<Order> {
-    return ListBase.push(order, history);
-  };
-
-  // Representing a customer
-  type Customer = {
-    customer_id : Nat;
-    name : Text;
-    email : Text
-  };
-
-  let customers = HashMap.HashMap<Nat, Customer>(0, Nat.equal, Hash.hash);
-
-  // Function to create a customer map
-  public func createCustomer(customer : Customer) : async () {
-    customers.put(customer.customer_id, customer);
-  };
-
-  // Variant to represent the result of a payment
-  type PaymentResult = {
-    #ok : Nat;
-    #err : Text;
-  };
-
-  type ProcessPaymentResult = Result.Result<Nat, Text>;
-
-  // Function to process payment
-  public func processPayment(amount : Nat, card_number : Text) : async ProcessPaymentResult {
-    // Simulate payment processing (in reality, you'd integrate with a payment gateway)
-    if (Text.size(card_number) > 10) {
-      // Simple validation
-      return #ok(amount);
-    } else {
-      return #err("Invalid card number");
-    }
   };
 };
